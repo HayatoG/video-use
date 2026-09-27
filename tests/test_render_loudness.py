@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).parents[1] / "helpers" / "render.py"
@@ -49,12 +50,42 @@ class SilentAudioLoudnormTests(unittest.TestCase):
             check=True,
         )
         self.assertEqual(json.loads(probe.stdout)["streams"][0]["codec_type"], "audio")
+        decoded = subprocess.run(
+            [
+                "ffmpeg", "-v", "error", "-i", str(output),
+                "-map", "0:a:0", "-f", "s16le", "-acodec", "pcm_s16le", "-",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertTrue(decoded, "output must contain decoded audio samples")
+        self.assertEqual(decoded, bytes(len(decoded)), "output audio must remain silent")
+        self.assertEqual(output.read_bytes(), self.source.read_bytes())
 
     def test_final_render_preserves_digital_silence(self):
         self.assert_silent_audio_is_preserved(preview=False)
 
     def test_draft_render_preserves_digital_silence(self):
         self.assert_silent_audio_is_preserved(preview=True)
+
+
+class LoudnormFallbackTests(unittest.TestCase):
+    def test_failed_measurement_encodes_once_without_remeasuring(self):
+        for measurement in (None, {"input_i": "invalid"}):
+            with self.subTest(measurement=measurement):
+                with mock.patch.object(render, "measure_loudness", return_value=measurement) as measure:
+                    with mock.patch.object(render.subprocess, "run") as encode:
+                        source, output = Path("input.mp4"), Path("output.mp4")
+                        self.assertTrue(render.apply_loudnorm_two_pass(source, output))
+                measure.assert_called_once_with(source)
+                encode.assert_called_once()
+                command = encode.call_args.args[0]
+                self.assertEqual(
+                    command[command.index("-af") + 1],
+                    f"loudnorm=I={render.LOUDNORM_I}:TP={render.LOUDNORM_TP}:LRA={render.LOUDNORM_LRA}",
+                )
+                self.assertEqual(command[-1], str(output))
+                self.assertTrue(encode.call_args.kwargs["check"])
 
 
 if __name__ == "__main__":

@@ -593,7 +593,10 @@ def apply_loudnorm_two_pass(
                 shutil.copyfile(input_path, output_path)
                 return True
 
-    if preview:
+    if measurement is None and not preview:
+        print("  loudnorm measurement failed — falling back to 1-pass")
+
+    if preview or measurement is None:
         # One-pass approximation — faster, slightly less accurate.
         filter_str = f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}"
         cmd = [
@@ -610,9 +613,6 @@ def apply_loudnorm_two_pass(
         return True
 
     # Full two-pass
-    if measurement is None:
-        print("  loudnorm measurement failed — falling back to 1-pass")
-        return apply_loudnorm_two_pass(input_path, output_path, preview=True)
 
     print(f"    measured: I={measurement['input_i']} LUFS  "
           f"TP={measurement['input_tp']}  LRA={measurement['input_lra']}")
