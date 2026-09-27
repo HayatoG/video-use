@@ -593,7 +593,7 @@ def apply_loudnorm_two_pass(
                 shutil.copyfile(input_path, output_path)
                 return True
 
-    if measurement is None and not preview:
+    if measurement is None:
         print("  loudnorm measurement failed — falling back to 1-pass")
 
     if preview or measurement is None:
@@ -608,7 +608,8 @@ def apply_loudnorm_two_pass(
             "-movflags", "+faststart",
             str(output_path),
         ]
-        print(f"  loudnorm (1-pass preview) → {output_path.name}")
+        mode = "1-pass preview" if preview else "1-pass fallback"
+        print(f"  loudnorm ({mode}) → {output_path.name}")
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         return True
 

@@ -1,4 +1,6 @@
 import importlib.util
+import io
+from contextlib import redirect_stdout
 import json
 import shutil
 import subprocess
@@ -71,12 +73,18 @@ class SilentAudioLoudnormTests(unittest.TestCase):
 
 class LoudnormFallbackTests(unittest.TestCase):
     def test_failed_measurement_encodes_once_without_remeasuring(self):
-        for measurement in (None, {"input_i": "invalid"}):
-            with self.subTest(measurement=measurement):
+        for measurement, preview in ((None, False), ({"input_i": "invalid"}, False), (None, True)):
+            with self.subTest(measurement=measurement, preview=preview):
+                log = io.StringIO()
                 with mock.patch.object(render, "measure_loudness", return_value=measurement) as measure:
-                    with mock.patch.object(render.subprocess, "run") as encode:
+                    with mock.patch.object(render.subprocess, "run") as encode, redirect_stdout(log):
                         source, output = Path("input.mp4"), Path("output.mp4")
-                        self.assertTrue(render.apply_loudnorm_two_pass(source, output))
+                        self.assertTrue(render.apply_loudnorm_two_pass(source, output, preview=preview))
+                self.assertIn("measurement failed", log.getvalue())
+                if preview:
+                    self.assertIn("1-pass preview", log.getvalue())
+                else:
+                    self.assertNotIn("preview", log.getvalue())
                 measure.assert_called_once_with(source)
                 encode.assert_called_once()
                 command = encode.call_args.args[0]
