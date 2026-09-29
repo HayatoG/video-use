@@ -400,8 +400,10 @@ def extract_segment(
     vertical: bool = False,
     layout: str = "blur_pad",
     split_faces: list | None = None,
+    fade_in: float = 0.03,
+    fade_out: float = 0.03,
 ) -> None:
-    """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
+    """Extract a cut range as its own clip with grade + audio fades baked in.
 
     `-ss` before `-i` for fast accurate seeking. Scale to 1080p from 4K.
     Portrait sources (height > width) are scaled by height to preserve orientation.
@@ -527,10 +529,12 @@ def extract_segment(
     n_frames = max(1, round(duration * Fraction(out_rate)))
     vdur = float(n_frames / Fraction(out_rate))
 
-    # 30ms audio fades at both edges (Rule 3) — prevent pops
-    fade_out_start = max(0.0, vdur - 0.03)
+    # Audio fades at both edges (Rule 3: 30ms default) — prevent pops. An EDL
+    # range may lengthen them (`fade_in` / `fade_out`) for a softer transition.
+    fade_out_start = max(0.0, vdur - fade_out)
     af = (
-        f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03,"
+        f"afade=t=in:st=0:d={fade_in:.3f},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={fade_out:.3f},"
         f"atrim=end={vdur:.6f},apad=whole_dur={vdur:.6f}"
     )
 
@@ -633,6 +637,8 @@ def extract_all_segments(
             portrait=portrait, hdr=hdr,
             vertical=vertical, layout=r.get("layout", "blur_pad"),
             split_faces=r.get("split_faces"),
+            fade_in=float(r.get("fade_in", 0.03)),
+            fade_out=float(r.get("fade_out", 0.03)),
         )
         seg_paths.append(out_path)
 
@@ -774,6 +780,11 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
         seg_start = float(r["start"])
         seg_end = float(r["end"])
         seg_duration = measured[seg_i] if measured else (seg_end - seg_start)
+
+        # A range can opt out of captions (e.g. a music-only or title beat).
+        if r.get("subtitles") is False:
+            seg_offset += seg_duration
+            continue
 
         tr_path = transcripts_dir / f"{src_name}.json"
         if not tr_path.exists():
