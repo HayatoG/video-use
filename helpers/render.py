@@ -117,39 +117,13 @@ def probe_duration(path: Path) -> float:
 def resolve_path(maybe_path: str, base: Path) -> Path:
     """Resolve a path that may be absolute or relative to `base`.
 
-    Security: This function validates that the resolved path stays within
-    the intended ``base`` directory to prevent path traversal attacks.
-    Absolute paths are rejected. Symlink-based bypasses are mitigated by
-    calling ``Path.resolve()`` (which resolves symlinks) **before** the
-    containment check.
-
-    Raises:
-        ValueError: If ``maybe_path`` is absolute, or if the resolved path
-            falls outside ``base``.
+    Sources live next to (not inside) the edit dir and the EDL documents
+    absolute paths, so neither form may be rejected here.
     """
     p = Path(maybe_path)
     if p.is_absolute():
-        raise ValueError(f"Absolute paths are not allowed: {maybe_path}")
-
-    resolved = (base / p).resolve()
-    base_resolved = base.resolve()
-
-    # Python 3.9+: use Path.is_relative_to()
-    if hasattr(resolved, "is_relative_to"):
-        if not resolved.is_relative_to(base_resolved):
-            raise ValueError(
-                f"Path traversal detected: {maybe_path} resolves to {resolved}, "
-                f"which is outside the allowed directory {base_resolved}"
-            )
-    else:
-        # Fallback for Python < 3.9: string prefix check
-        if not str(resolved).startswith(str(base_resolved)):
-            raise ValueError(
-                f"Path traversal detected: {maybe_path} resolves to {resolved}, "
-                f"which is outside the allowed directory {base_resolved}"
-            )
-
-    return resolved
+        return p
+    return (base / p).resolve()
 
 
 def resolve_subtitles_path(maybe_path: str, edit_dir: Path) -> Path:
