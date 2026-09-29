@@ -160,3 +160,4 @@ For graphics attached to a filmed surface, the optional [planar tracking helper]
 Use the optional [motion export quality checker](references/motion-quality.md) to validate encoded delivery properties and generate contact sheets for visual review.
 Use the optional [motion resource catalog](skills/motion-design/references/library.md) to search references and explicitly fetch assets with pinned sizes and hashes.
 To remember the tool files available for an edit and check whether they changed later, see [keep a tool record](references/tool-history.md).
+For a step-by-step guide from raw footage to delivery, see [the editing workflow](references/editing-workflow.md).
