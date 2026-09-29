@@ -933,9 +933,9 @@ def burn_subtitles(
         style_escaped = style.replace("'", r"\'")
         if fontsdir is not None:
             fd = subs_filter_escape(fontsdir)
-            subs_filter = f"subtitles='{subs_arg}':fontsdir='{fd}':force_style='{style_escaped}'"
+            subs_filter = f"subtitles=filename='{subs_arg}':fontsdir='{fd}':force_style='{style_escaped}'"
         else:
-            subs_filter = f"subtitles='{subs_arg}':force_style='{style_escaped}'"
+            subs_filter = f"subtitles=filename='{subs_arg}':force_style='{style_escaped}'"
 
         if global_voice is None:
             # No audio work — just burn subtitles, copy audio.
