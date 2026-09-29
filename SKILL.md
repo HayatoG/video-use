@@ -80,6 +80,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 
 - **`narrate.py <script> -o <base>`** — generate ElevenLabs narration with word timing, SRT sidecars and verified output caching. See `references/narration.md`.
 - **`sheet.py`** — build native-frame contact sheets and cached full-resolution reviews. See [frame review](references/frames.md).
+- **`song_scan.py`, `identify_track.py`, `motion_audio.py`** — measure music timing, compare supplied recordings, and export audio controls. See [audio analysis](references/audio-analysis.md).
 
 - **`source_scan.py`, `prepare_source.py`, `find_shot.py`, `project_state.py`** — inspect selected sources and retain provenance. See [source inspection](references/sources.md).
 
