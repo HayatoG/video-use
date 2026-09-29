@@ -79,6 +79,8 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 ## Helpers
 
 - **`narrate.py <script> -o <base>`** — generate ElevenLabs narration with word timing, SRT sidecars and verified output caching. See `references/narration.md`.
+- **`sheet.py`** — build native-frame contact sheets and cached full-resolution reviews. See [frame review](references/frames.md).
+
 - **`source_scan.py`, `prepare_source.py`, `find_shot.py`, `project_state.py`** — inspect selected sources and retain provenance. See [source inspection](references/sources.md).
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
