@@ -3,7 +3,7 @@
 Implements the HEURISTICS render pipeline in the correct order:
 
   1. Per-segment extract with color grade + 30ms audio fades baked in
-  2. Concat into base.mp4 with copied video and continuous AAC audio
+  2. Concat sample-exact PCM segments into base.mp4 (copied video, one AAC encode)
   3. If overlays or subtitles: single filter graph that overlays animations
      (with PTS shift so frame 0 lands at the overlay window start)
      and applies `subtitles` filter LAST → final.mp4
@@ -506,10 +506,6 @@ def extract_segment(
             vf_parts.append(grade_filter)
         vf = ",".join(vf_parts)
 
-    # 30ms audio fades at both edges (Rule 3) — prevent pops
-    fade_out_start = max(0.0, duration - 0.03)
-    af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
-
     if draft:
         preset, crf = "ultrafast", "28"
     elif preview:
@@ -523,11 +519,29 @@ def extract_segment(
     # own rate; fall back to 24 only if it can't be probed.
     out_rate = rate if rate is not None else (probe_source_fps(source) or "24")
 
+    # Quantize the segment to whole output frames, then force the audio to the
+    # exact same duration (PCM intermediates are sample-exact). Otherwise video
+    # rounds up to a whole frame while audio keeps the raw -t length, and every
+    # join gets a 17-40ms mismatch (upstream PR #62 measured -0.57s of drift
+    # over 37 segments before the concat re-encoded audio).
+    n_frames = max(1, round(duration * Fraction(out_rate)))
+    vdur = float(n_frames / Fraction(out_rate))
+
+    # 30ms audio fades at both edges (Rule 3) — prevent pops
+    fade_out_start = max(0.0, vdur - 0.03)
+    af = (
+        f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03,"
+        f"atrim=end={vdur:.6f},apad=whole_dur={vdur:.6f}"
+    )
+
     cmd = [
         "ffmpeg", "-y",
         "-ss", f"{seg_start:.3f}",
         "-i", str(source),
-        "-t", f"{duration:.3f}",
+        # -t overshoots so the audio filters have enough input to atrim/apad to
+        # exactly vdur; video is capped by -frames:v instead.
+        "-t", f"{vdur + 0.5:.3f}",
+        "-frames:v", str(n_frames),
     ]
     if vertical:
         cmd += ["-filter_complex", filter_complex, "-map", "[outv]", "-map", "0:a"]
@@ -537,8 +551,7 @@ def extract_segment(
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
         "-pix_fmt", "yuv420p", "-r", out_rate,
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-        "-movflags", "+faststart",
+        "-c:a", "pcm_s16le", "-ar", "48000",
         str(out_path),
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -552,7 +565,7 @@ def extract_all_segments(
     fps: str | None = None,
     vertical: bool = False,
 ) -> list[Path]:
-    """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
+    """Extract every EDL range into edit_dir/clips_graded/seg_NN.mov (PCM audio).
     Returns the ordered list of segment paths.
 
     If the EDL `grade` is "auto", analyze each segment range with
@@ -602,7 +615,7 @@ def extract_all_segments(
         start = float(r["start"])
         end = float(r["end"])
         duration = end - start
-        out_path = clips_dir / f"seg_{i:02d}_{src_name}.mp4"
+        out_path = clips_dir / f"seg_{i:02d}_{src_name}.mov"
 
         if is_auto:
             seg_filter, _stats = auto_grade_for_clip(src_path, start=start, duration=duration, verbose=False)
