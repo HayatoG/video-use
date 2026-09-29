@@ -98,7 +98,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
 - **`pack_transcripts.py --edit-dir <dir>`** — `transcripts/*.json` → `takes_packed.md` (phrase-level, break on silence ≥ 0.5s).
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
-- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline.
+- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline. `--height` sets the output height (default 1080) and `--crf` the extract quality (default 16 final / 22 preview) — see *Output quality* below. `--vertical` renders a 9:16 canvas (per-range `layout`: `blur_pad` default, or `split_stack` for a genuine side-by-side two-shot). `--music <file> --duck-level <dB>` mixes a looped bed that ducks under speech.
 - **`grade.py <in> -o <out>`** — ffmpeg filter chain grade. Presets + `--filter '<raw>'` for custom.
 - **`review.py <video>`** — writes a browser page next to the cut where the user scrubs and leaves timecode-anchored comments (`cut` / `shorten` / `lengthen` / `wrong` / free text / voice), optionally pinned to a spot inside the frame by clicking the picture. `--dump <notes.json>` prints them back as time-ordered markdown, transcribing voice notes. No server: the page is opened from disk. Chrome/Edge save to disk directly; other browsers fall back to a download.
 
@@ -170,7 +170,7 @@ Read [the sound guide](references/context/sound.md) when this capability is need
 
 ## Output spec
 
-Match the source unless the user asked for something specific. Common targets: `1920×1080@24` cinematic, `1920×1080@30` screen content, `1080×1920@30` vertical social, `3840×2160@24` 4K cinema, `1080×1080@30` square. `render.py` preserves the first segment source's frame rate (falling back to 24 fps when probing fails); use `--fps` to override it. It scales each source's long edge to 1920 pixels (1280 in draft mode). Edit the extraction settings when another size is required; `--filter` belongs to `grade.py`, not `render.py`. Worth asking the user which delivery format matters.
+Match the source unless the user asked for something specific. Common targets: `1920×1080@24` cinematic, `1920×1080@30` screen content, `1080×1920@30` vertical social, `3840×2160@24` 4K cinema, `1080×1080@30` square. `render.py` preserves the first segment source's frame rate (falling back to 24 fps when probing fails); use `--fps` to override it. It scales to 1080p (720p in draft mode); pass `--height` for other targets (e.g. `--height 2160` to deliver at a 4K source's own resolution). Width follows the source aspect, so `--height` is the only resolution knob you need — do not hand-edit the extract command. `--filter` belongs to `grade.py`, not `render.py`. Worth asking the user which delivery format matters.
 
 ## EDL format
 
@@ -194,6 +194,24 @@ Match the source unless the user asked for something specific. Common targets: `
 ```
 
 `grade` is a preset name or raw ffmpeg filter. `overlays` are rendered animation clips. `subtitles` is optional and applied LAST.
+
+`audio_filter` is an optional global audio chain (denoise, EQ) applied per segment **before** the fades, so the fades stay on the true segment edges (Hard Rule 3).
+
+Optional per-range keys:
+- `fade_in` / `fade_out` (seconds, default 0.03) — lengthen a range's audio fades for a softer transition. Never go below 0.03 (Hard Rule 3).
+- `subtitles: false` — no captions for this range when `--build-subtitles` builds the SRT (music-only beats, title cards).
+- `zoom` (≥ 1.0) with `zoom_x` (0–1, default 0.45) — a push-in to disguise jump cuts on a static single-camera shot. A plain number rather than a filter so one EDL stays correct at every output resolution.
+- `filter` — raw per-segment ffmpeg escape hatch. A hardcoded `crop` is only valid at one output height, and **any per-segment dimension mismatch breaks the lossless concat** (Hard Rule 2).
+- `layout` / `split_faces` — only with `--vertical`.
+
+## Output quality
+
+The video is encoded **twice**: once per segment on extract, then again to composite overlays and burn subtitles. The concat copies video, so it is lossless. This means the **extract CRF is the quality ceiling** — the composite encode can only add loss on top of it, never recover detail.
+
+- `--crf` sets that ceiling. Defaults: 16 final, 22 `--preview`, 28 `--draft`. The composite encode is derived as `crf - 2`.
+- `--height` sets the output height; the default 1080 downscales a 4K source and throws away three quarters of its pixels. Pass `--height 2160` to deliver at the source resolution.
+
+If someone reports the output looking soft or compressed, check **bits per pixel**, not bitrate: a 50 Mbps 4K source and a 12.7 Mbps 1080p render are both ≈0.25 bits/px, which means the loss came from discarded pixels and stacked generations rather than bitrate starvation.
 
 ## Memory — `project.md`
 

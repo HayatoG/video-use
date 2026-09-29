@@ -80,6 +80,11 @@ class SourceProbeReuseTests(unittest.TestCase):
         )
 
 
+def _scaled_dims(video, target_h, portrait):
+    """What probe_scaled_dims measures for a 16:9 source."""
+    return (target_h, round(target_h * 16 / 9)) if portrait else (round(target_h * 16 / 9), target_h)
+
+
 class ExtractSegmentArgumentTests(unittest.TestCase):
     def _extract(self, **kwargs) -> list[str]:
         """Run extract_segment with the probes patched out, return the ffmpeg cmd."""
@@ -90,6 +95,7 @@ class ExtractSegmentArgumentTests(unittest.TestCase):
             with (
                 patch.object(render, "is_portrait_source", side_effect=unreachable),
                 patch.object(render, "is_hdr_source", side_effect=unreachable),
+                patch.object(render, "probe_scaled_dims", side_effect=_scaled_dims),
                 patch.object(render.subprocess, "run") as run,
             ):
                 render.extract_segment(
@@ -110,11 +116,11 @@ class ExtractSegmentArgumentTests(unittest.TestCase):
     def test_hdr_false_leaves_the_tonemap_chain_out(self):
         self.assertNotIn("tonemap", self._vf(portrait=False, hdr=False))
 
-    def test_portrait_true_scales_by_height(self):
-        self.assertIn("scale=-2:1920", self._vf(portrait=True, hdr=False))
+    def test_portrait_true_scales_to_a_portrait_frame(self):
+        self.assertIn("scale=1080:1920", self._vf(portrait=True, hdr=False))
 
-    def test_portrait_false_scales_by_width(self):
-        self.assertIn("scale=1920:-2", self._vf(portrait=False, hdr=False))
+    def test_portrait_false_scales_to_a_landscape_frame(self):
+        self.assertIn("scale=1920:1080", self._vf(portrait=False, hdr=False))
 
     def test_omitted_arguments_still_probe(self):
         """The new arguments are optional; old callers keep the old behavior."""
@@ -122,6 +128,7 @@ class ExtractSegmentArgumentTests(unittest.TestCase):
             with (
                 patch.object(render, "is_portrait_source", return_value=False) as portrait,
                 patch.object(render, "is_hdr_source", return_value=False) as hdr,
+                patch.object(render, "probe_scaled_dims", side_effect=_scaled_dims),
                 patch.object(render.subprocess, "run"),
             ):
                 render.extract_segment(
