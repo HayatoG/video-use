@@ -82,6 +82,8 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`sheet.py`** — build native-frame contact sheets and cached full-resolution reviews. See [frame review](references/frames.md).
 - **`song_scan.py`, `identify_track.py`, `motion_audio.py`** — measure music timing, compare supplied recordings, and export audio controls. See [audio analysis](references/audio-analysis.md).
 - **`mix_audio.py`, `map_transcript.py`** — mix independent audio tracks and map intact words onto the sample clock. See [audio mixing](references/audio-mixing.md).
+- **`visuals.py`, `effects.py`, `track_mask.py`** — compose canvas treatments and layers and track reviewed masks. See [effects and masks](references/effects.md).
+
 - **`caption_raster.py`, `cards.py`** — render styled caption images and measured word cards. See [caption rendering](references/caption-rendering.md).
 
 - **`source_scan.py`, `prepare_source.py`, `find_shot.py`, `project_state.py`** — inspect selected sources and retain provenance. See [source inspection](references/sources.md).
