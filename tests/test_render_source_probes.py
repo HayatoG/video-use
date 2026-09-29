@@ -103,7 +103,9 @@ class ExtractSegmentArgumentTests(unittest.TestCase):
         return cmd[cmd.index("-vf") + 1]
 
     def test_hdr_true_prepends_the_tonemap_chain(self):
-        self.assertTrue(self._vf(portrait=False, hdr=True).startswith(render.TONEMAP_CHAIN))
+        chain = "setparams=color_trc=arib-std-b67," + render.TONEMAP_CHAIN
+        with patch.object(render, "_source_tonemap_filter", return_value=chain):
+            self.assertTrue(self._vf(portrait=False, hdr=True).startswith(chain))
 
     def test_hdr_false_leaves_the_tonemap_chain_out(self):
         self.assertNotIn("tonemap", self._vf(portrait=False, hdr=False))
