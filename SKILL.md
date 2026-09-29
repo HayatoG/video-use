@@ -158,6 +158,21 @@ Alignment=2,MarginV=90
 **`natural-sentence`** (if you invent this mode) — narrative, documentary, education. 4–7 word chunks, sentence case, break on natural pauses, `MarginV=60–80`, larger font for readability, slightly wider max-width. No shipped force_style — design one if you need it.
 
 Invent a third style if neither fits. Hard rules: subtitles LAST (Rule 1), output-timeline offsets (Rule 5).
+
+**Driving it from the EDL.** `render.py --build-subtitles` reads an optional `subtitle_style` block, so a style is data rather than a code edit:
+
+```json
+"subtitle_style": {
+  "words_per_chunk": 6,
+  "break_on": ".!?",
+  "balance": true,
+  "case": "sentence",
+  "force_style": "FontName=Helvetica,FontSize=13,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=28"
+}
+```
+
+Without `words_per_chunk` / `break_on` / `balance` / `min_words`, chunking stays phrase-aware (`chunk_words`); any of them switches to fixed-size cues split at `break_on`. `case` is `"upper"` (default) or `"sentence"` (keeps ASR capitalization, and capitalizes a cue that opens a sentence after a cut). `force_style` replaces `SUB_FORCE_STYLE`; its `MarginV` is relative to `PlayResY=288` — the default 90 is tuned for vertical video, around 28 sits 10% up on 16:9.
+
 Read [the captions guide](references/context/captions.md) when this capability is needed.
 
 ## Animations (when requested)
