@@ -889,9 +889,15 @@ def build_final_composite(
         # a no-op there and this stays identical to the prior behavior.
         subs_abs = str(subtitles_path.resolve()).replace("\\", "/")
         subs_abs = subs_abs.replace(":", r"\:").replace("'", r"\'")
-        filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{SUB_FORCE_STYLE}'[outv]"
-        )
+        # filename= (named option) is required: ffmpeg 8's filtergraph parser
+        # rejects the positional quoted form when the path needs quoting.
+        if subtitles_path.suffix.lower() == ".ass":
+            # ASS files carry their own styles — force_style would clobber them.
+            filter_parts.append(f"{current}subtitles=filename='{subs_abs}'[outv]")
+        else:
+            filter_parts.append(
+                f"{current}subtitles=filename='{subs_abs}':force_style='{SUB_FORCE_STYLE}'[outv]"
+            )
         out_label = "[outv]"
     else:
         # Rename the last overlay output to [outv] for consistency
