@@ -6,6 +6,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
     "requests",
+    "librosa",
     "matplotlib",
     "pillow",
     "numpy",
