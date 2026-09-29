@@ -158,3 +158,4 @@ For original HTML/CSS/canvas motion, the optional [browser capture helper](skill
 For authored browser animations, optional [motion primitives](skills/motion-design/references/runtime.md) provide numeric keyframes, transforms, text fitting, media seeking, and two-bone rigs without additional npm dependencies.
 For graphics attached to a filmed surface, the optional [planar tracking helper](skills/motion-design/references/footage-tracking.md) measures perspective transforms and hides overlays when tracking is lost.
 Use the optional [motion export quality checker](references/motion-quality.md) to validate encoded delivery properties and generate contact sheets for visual review.
+Use the optional [motion resource catalog](skills/motion-design/references/library.md) to search references and explicitly fetch assets with pinned sizes and hashes.
