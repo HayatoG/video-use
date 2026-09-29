@@ -17,6 +17,7 @@ test = ["pytest>=7"]
 animations = ["manim"]
 bw-stt = ["websockets>=12"]
 editing = ["opencv-python-headless>=4.10,<5"]
+motion-tracking = ["opencv-python-headless>=4.10,<5"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

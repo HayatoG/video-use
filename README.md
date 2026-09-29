@@ -156,3 +156,4 @@ See [`SKILL.md`](./SKILL.md) for the full production rules and editing craft.
 
 For original HTML/CSS/canvas motion, the optional [browser capture helper](skills/motion-design/references/browser-rendering.md) renders exact frame times to MP4 and saves proof frames and an asset manifest.
 For authored browser animations, optional [motion primitives](skills/motion-design/references/runtime.md) provide numeric keyframes, transforms, text fitting, media seeking, and two-bone rigs without additional npm dependencies.
+For graphics attached to a filmed surface, the optional [planar tracking helper](skills/motion-design/references/footage-tracking.md) measures perspective transforms and hides overlays when tracking is lost.
