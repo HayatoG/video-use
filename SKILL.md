@@ -87,6 +87,8 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`caption_raster.py`, `cards.py`** — render styled caption images and measured word cards. See [caption rendering](references/caption-rendering.md).
 
 - **`source_scan.py`, `prepare_source.py`, `find_shot.py`, `project_state.py`** — inspect selected sources and retain provenance. See [source inspection](references/sources.md).
+- **`fetch_asset.py image|logo|emoji`** — acquire still assets with source metadata and protected outputs. See `references/assets.md`.
+- **`web_shot.py capture|card`** — capture webpage evidence and prepare transparent image cards. See `references/assets.md`.
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
 - **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above, for anyone who already has a Deepgram key. Emits the identical `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles` consume it unchanged. `--language multi` for code-switched speech; `--convert <response.json>` maps an existing response offline with no API call. Cached per source **and** per provider/model/language. **No audio-event tags** — see Setup.
