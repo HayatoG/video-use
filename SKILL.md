@@ -90,6 +90,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`fetch_asset.py image|logo|emoji`** — acquire still assets with source metadata and protected outputs. See `references/assets.md`.
 - **`web_shot.py capture|card`** — capture webpage evidence and prepare transparent image cards. See `references/assets.md`.
 - **`music_bed.py -o <file.wav>`** — create a simple ambient background loop when the user wants locally generated music without external recordings or paid services. Supports tempo, key and seed controls. Listen before use, then mix separately. See `references/music.md`.
+- **`motion_slot.py init|asset|check|render`** — create isolated browser-animation projects for product demos, kinetic typography and motion graphics, then verify the encoded MP4. See `references/slots.md`.
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
 - **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above, for anyone who already has a Deepgram key. Emits the identical `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles` consume it unchanged. `--language multi` for code-switched speech; `--convert <response.json>` maps an existing response offline with no API call. Cached per source **and** per provider/model/language. **No audio-event tags** — see Setup.
