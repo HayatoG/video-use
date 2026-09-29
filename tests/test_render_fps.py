@@ -59,6 +59,11 @@ class ProbeSourceFpsTests(unittest.TestCase):
         })
         return subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
 
+    def test_vfr_phone_average_snaps_to_nominal_rate(self):
+        result = self._probe_result("472545000/15745561", "30/1")
+        with patch.object(render.subprocess, "run", return_value=result):
+            self.assertEqual(render.probe_source_fps(Path("source.mp4")), "30/1")
+
     def test_prefers_average_rate(self):
         result = self._probe_result("30000/1001", "30/1")
         with patch.object(render.subprocess, "run", return_value=result):

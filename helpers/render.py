@@ -484,6 +484,19 @@ def probe_source_fps(video: Path) -> str | None:
         streams = json.loads(out.stdout).get("streams") or []
         if not streams:
             return None
+        # Phone footage is VFR around a nominal rate: avg comes out as e.g.
+        # 472545000/15745561 (30.011 fps). When avg is not itself a standard
+        # rate (N or N*1000/1001) and sits within 1% of r_frame_rate, the
+        # nominal rate is what the user shot at, so deliver that.
+        try:
+            avg = Fraction(streams[0].get("avg_frame_rate") or "0/1")
+            nominal = Fraction(streams[0].get("r_frame_rate") or "0/1")
+            standard = avg.denominator == 1 or (avg * 1001 / 1000).denominator == 1
+            if (avg and nominal and not standard
+                    and abs(avg - nominal) / nominal < Fraction(1, 100)):
+                return parse_fps(str(nominal))
+        except (ValueError, ZeroDivisionError, argparse.ArgumentTypeError):
+            pass
         for field in ("avg_frame_rate", "r_frame_rate"):
             value = streams[0].get(field)
             if value and value != "0/0":
@@ -1030,6 +1043,10 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
                 measured = None
 
     entries: list[tuple[float, float, str]] = []
+    # A word whose timestamps straddle a cut overlaps two ranges; caption it
+    # once, in the first. (Engines that fold pauses into word durations, like
+    # Apple's SpeechTranscriber, produce these routinely.)
+    captioned: set[tuple[str, float, float]] = set()
     seg_offset = 0.0
 
     for seg_i, r in enumerate(edl["ranges"]):
@@ -1050,7 +1067,12 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
             continue
 
         transcript = json.loads(tr_path.read_text())
-        words_in_seg = _words_in_range(transcript, seg_start, seg_end)
+        words_in_seg = []
+        for w in _words_in_range(transcript, seg_start, seg_end):
+            key = (src_name, w["start"], w["end"])
+            if key not in captioned:
+                captioned.add(key)
+                words_in_seg.append(w)
 
         if use_fixed:
             chunks = chunk_words_fixed(words_in_seg, words_per_chunk, break_on,
