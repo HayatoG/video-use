@@ -75,6 +75,8 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 
 ## Helpers
 
+- **`narrate.py <script> -o <base>`** — generate ElevenLabs narration with word timing, SRT sidecars and verified output caching. See `references/narration.md`.
+
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
 - **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above, for anyone who already has a Deepgram key. Emits the identical `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles` consume it unchanged. `--language multi` for code-switched speech; `--convert <response.json>` maps an existing response offline with no API call. Cached per source **and** per provider/model/language. **No audio-event tags** — see Setup.
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
