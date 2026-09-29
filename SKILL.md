@@ -65,6 +65,8 @@ First-time install lives in `install.md` (clone, deps, ffmpeg, skill registratio
     - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical, and it diarizes. But it returns **no audio-event tokens**, so the `(laughs)`/`(applause)` beat signals in *Cut craft* are unavailable — lean on silence gaps and `timeline_view` instead. Prefer Scribe for reaction-heavy or multi-speaker material where audio events carry the beats.
 
 - **Establish what language is actually spoken before transcribing a batch.** Transcribe one clip, read it against a frame, then run the rest. A wrong `--language` does not error or report low confidence — it returns fluent, grammatical nonsense and silently drops words. For code-switched speech (e.g. Hindi and English alternating mid-sentence) pass `--language multi`; `detect_language` cannot help, because it commits to a single language per file. This matters beyond captions: the cut is reasoned from the transcript, so a language mismatch corrupts the edit itself.
+- `python helpers/check_env.py --videos-dir <videos_dir>` passes. Add `--require manim`, `--require remotion`, or `--require hyperframes` when the session will use that backend.
+- `ELEVENLABS_API_KEY` resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`).
 - `ffmpeg` + `ffprobe` on PATH.
 - Python deps installed (`uv sync` or `pip install -e .` inside the repo).
 - Node.js + npm available if the session needs HyperFrames or Remotion slots. HyperFrames currently requires Node.js 22+.
