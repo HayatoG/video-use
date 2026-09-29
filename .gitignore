@@ -4,6 +4,10 @@
 *.pem
 *.key
 
+# Local agent config (user-specific, may contain tokens in permission rules)
+.claude/settings.local.json
+.claude/memory/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -40,6 +44,9 @@ yarn.lock
 # Manim render artifacts (when running skills/manim-video scripts locally)
 media/
 *.log
+
+# Local project outputs (raw downloads, renders) kept alongside the repo
+videouse-projects/
 
 # Session artifacts if someone invokes the skill inside the project dir
 # (normally outputs go to <videos_dir>/edit/ — keep these as a safety net)

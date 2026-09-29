@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ffprobe *)",
+      "PowerShell(Get-Process *)",
+      "Bash(npm config get *)",
+      "mcp__claude_ai_Google_Drive__search_files",
+      "mcp__claude_ai_Google_Drive__get_file_metadata"
+    ]
+  }
+}

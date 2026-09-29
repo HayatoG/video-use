@@ -275,6 +275,18 @@ def is_hdr_source(video: Path) -> bool:
     return _source_tonemap_filter(video.resolve()) is not None
 
 
+def get_source_dims(video: Path) -> tuple[int, int]:
+    """Return (width, height) of the first video stream."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height",
+         "-of", "csv=p=0", str(video)],
+        capture_output=True, text=True, check=True,
+    )
+    w, h = map(int, out.stdout.strip().split(","))
+    return w, h
+
+
 def is_portrait_source(video: Path) -> bool:
     """Return True if the displayed video is portrait, including rotation."""
     try:
@@ -385,11 +397,40 @@ def extract_segment(
     rate: str | None = None,
     portrait: bool | None = None,
     hdr: bool | None = None,
+    vertical: bool = False,
+    layout: str = "blur_pad",
+    split_faces: list | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
     `-ss` before `-i` for fast accurate seeking. Scale to 1080p from 4K.
     Portrait sources (height > width) are scaled by height to preserve orientation.
+
+    `vertical=True` converts any source orientation to a 1080x1920 (or 720x1280
+    for draft) canvas. Two layouts:
+
+      - "blur_pad" (default): the full original frame is scaled to fit inside
+        the canvas untouched (no cropping — text overlays and full-frame shots
+        stay intact), with a blurred/cropped copy of the same frame filling the
+        letterbox bars top/bottom (landscape source) or sides (narrower-than-9:16
+        source). Use for anything that is NOT a genuine side-by-side split-screen
+        (single-subject shots, graphics/cards, B-roll) — cropping those would
+        cut off content for no benefit.
+      - "split_stack": for a genuine left/right split-screen (e.g. two hosts).
+        Crops the left half and right half of the frame and stacks them full-
+        width, top and bottom — uses the full 1080 width for each speaker
+        instead of shrinking both into a blurred letterbox. Only use this for
+        segments that are actually split-screen for their whole duration;
+        applying it to single-shot footage will crop content arbitrarily.
+
+        `split_faces` refines the split_stack crops: a list of two normalized
+        (x, y) face centers in the FULL source frame, [[left_cx, left_cy],
+        [right_cx, right_cy]]. Each panel's crop window is centered
+        horizontally on its face and places the face at ~42% of the panel
+        height (rule of thirds) instead of a blind center crop. Read the face
+        positions off a frame with timeline_view / ffmpeg before setting them.
+        Static crop — correct for locked-off studio shots; it does not track
+        a face that walks across the frame.
 
     Quality ladder:
       - final (default): 1080p libx264 fast CRF 20
@@ -403,21 +444,67 @@ def extract_segment(
     # in; probe here only when called standalone.
     if portrait is None:
         portrait = is_portrait_source(source)
-    if draft:
-        scale = "scale=-2:1280" if portrait else "scale=1280:-2"
-    else:
-        scale = "scale=-2:1920" if portrait else "scale=1920:-2"
+    long_edge = 1280 if draft else 1920
 
     if hdr is None:
         hdr = is_hdr_source(source)
+    tonemap = (_source_tonemap_filter(source.resolve()) or TONEMAP_CHAIN) if hdr else ""
 
-    vf_parts: list[str] = []
-    if hdr:
-        vf_parts.append(_source_tonemap_filter(source.resolve()) or TONEMAP_CHAIN)
-    vf_parts.append(scale)
-    if grade_filter:
-        vf_parts.append(grade_filter)
-    vf = ",".join(vf_parts)
+    if vertical:
+        w, h = (long_edge * 9) // 16, long_edge
+        pre = f"{tonemap}," if tonemap else ""
+        if layout == "split_stack":
+            half_h = h // 2
+            src_w, src_h = get_source_dims(source)
+            panel_w = src_w / 2
+            aspect = w / half_h  # 1080/960 = 1.125
+            crop_w = min(panel_w, src_h * aspect)
+            crop_h = crop_w / aspect
+            faces = split_faces or [[0.25, 0.5], [0.75, 0.5]]
+
+            def _panel_crop(i: int) -> tuple[int, int, int, int]:
+                panel_x0 = 0.0 if i == 0 else src_w / 2
+                fcx = faces[i][0] * src_w
+                fcy = faces[i][1] * src_h
+                x = max(panel_x0, min(fcx - crop_w / 2, panel_x0 + panel_w - crop_w))
+                # Face at ~42% of the crop height (rule of thirds), not dead center
+                y = max(0.0, min(fcy - 0.42 * crop_h, src_h - crop_h))
+                # Even coords for yuv420 chroma alignment
+                return (int(crop_w) // 2 * 2, int(crop_h) // 2 * 2,
+                        int(x) // 2 * 2, int(y) // 2 * 2)
+
+            lw, lh, lx, ly = _panel_crop(0)
+            rw, rh, rx, ry = _panel_crop(1)
+            filter_complex = (
+                f"[0:v]{pre}split=2[left_src][right_src];"
+                f"[left_src]crop={lw}:{lh}:{lx}:{ly},scale={w}:{half_h}[top];"
+                f"[right_src]crop={rw}:{rh}:{rx}:{ry},scale={w}:{half_h}[bottom];"
+                f"[top][bottom]vstack=inputs=2"
+            )
+        else:
+            # Blur-pad: full frame fit inside the canvas (no crop) over a
+            # blurred, cropped-to-fill copy of the same frame as background.
+            filter_complex = (
+                f"[0:v]{pre}split=2[bg_src][fg_src];"
+                f"[bg_src]scale={w}:{h}:force_original_aspect_ratio=increase,"
+                f"crop={w}:{h},gblur=sigma=25[bg];"
+                f"[fg_src]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
+                f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
+            )
+        if grade_filter:
+            filter_complex += f",{grade_filter}"
+        filter_complex += "[outv]"
+    else:
+        scale = "scale=-2:1920" if portrait else "scale=1920:-2"
+        if draft:
+            scale = "scale=-2:1280" if portrait else "scale=1280:-2"
+        vf_parts: list[str] = []
+        if tonemap:
+            vf_parts.append(tonemap)
+        vf_parts.append(scale)
+        if grade_filter:
+            vf_parts.append(grade_filter)
+        vf = ",".join(vf_parts)
 
     # 30ms audio fades at both edges (Rule 3) — prevent pops
     fade_out_start = max(0.0, duration - 0.03)
@@ -441,7 +528,12 @@ def extract_segment(
         "-ss", f"{seg_start:.3f}",
         "-i", str(source),
         "-t", f"{duration:.3f}",
-        "-vf", vf,
+    ]
+    if vertical:
+        cmd += ["-filter_complex", filter_complex, "-map", "[outv]", "-map", "0:a"]
+    else:
+        cmd += ["-vf", vf]
+    cmd += [
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
         "-pix_fmt", "yuv420p", "-r", out_rate,
@@ -458,6 +550,7 @@ def extract_all_segments(
     preview: bool,
     draft: bool = False,
     fps: str | None = None,
+    vertical: bool = False,
 ) -> list[Path]:
     """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
     Returns the ordered list of segment paths.
@@ -525,6 +618,8 @@ def extract_all_segments(
             src_path, start, duration, seg_filter, out_path,
             preview=preview, draft=draft, rate=out_rate,
             portrait=portrait, hdr=hdr,
+            vertical=vertical, layout=r.get("layout", "blur_pad"),
+            split_faces=r.get("split_faces"),
         )
         seg_paths.append(out_path)
 
@@ -946,6 +1041,11 @@ def build_final_composite(
 
 
 def main() -> None:
+    # Windows consoles often default to cp1252, which can't encode the arrow
+    # characters used in progress prints (U+2192) — replace instead of crashing.
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+
     ap = argparse.ArgumentParser(description="Render a video from an EDL")
     ap.add_argument("edl", type=Path, help="Path to edl.json")
     ap.add_argument("-o", "--output", type=Path, required=True, help="Output video path")
@@ -982,6 +1082,13 @@ def main() -> None:
              "(falls back to 24 if it can't be probed). Pass e.g. --fps 30 or "
              "--fps 30000/1001 to force.",
     )
+    ap.add_argument(
+        "--vertical",
+        action="store_true",
+        help="Force 1080x1920 (720x1280 in --draft) output via blur-pad, regardless of "
+             "source orientation. Full frame is preserved (no crop) with a blurred "
+             "copy of the same frame filling the letterbox bars.",
+    )
     args = ap.parse_args()
 
     edl_path = args.edl.resolve()
@@ -994,7 +1101,8 @@ def main() -> None:
 
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
-        edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps
+        edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps,
+        vertical=args.vertical,
     )
 
     # 2. Concat → base
